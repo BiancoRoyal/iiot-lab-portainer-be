@@ -1,0 +1,104 @@
+# stack iiot_lab
+version: '3.1'
+
+services:
+
+  proxy:
+    container_name: proxy_edge
+    image: caddy:alpine
+    restart: always
+    environment:
+      PROJECT_NAME: "IIoT Lab Germany"
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - web_config:/config
+      - caddy:/etc/caddy
+      - ssl:/etc/ssl/web
+      - web_data:/data
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - lab_net
+    depends_on:
+      - broker
+
+  broker:
+    container_name: mq_edge
+    image: hivemq/hivemq4
+    restart: always
+    environment:
+      - HIVEMQ_CONTROL_CENTER_USER=${USER_NAME}
+      - HIVEMQ_CONTROL_CENTER_PASSWORD=${USER_PASSWORD}
+      - HIVEMQ_LICENSE=¢{HIVEMQ_LICENSE}
+      - HIVEMQ_LOG_LEVEL=${HIVEMQ_LOG_LEVEL}
+      - HIVEMQ_ALLOW_ALL_CLIENTS=${HIVEMQ_ALLOW_ALL_CLIENTS}
+    networks:
+      - lab_net
+    ports:
+      - "1883:1883"
+      # - "8000:8000"
+      - "8080:8080"
+      - "8883:8883"
+
+  time_series:
+    container_name: ts_edge
+    image: influxdb:2.0
+    restart: always
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=${INFLUXDB_INIT_MODE}
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=${INFLUXDB_INIT_ADMIN_TOKEN}
+      - DOCKER_INFLUXDB_INIT_USERNAME=${USER_NAME}
+      - DOCKER_INFLUXDB_INIT_PASSWORD=${USER_PASSWORD}
+      - DOCKER_INFLUXDB_INIT_ORG=${INFLUXDB_ORG}
+      - DOCKER_INFLUXDB_INIT_BUCKET=${INFLUXDB_BUCKET}
+      - DOCKER_INFLUXDB_INIT_RETENTION=${INFLUXDB_RETENTION}
+    expose:
+      - 8086
+    networks:
+      - lab_net
+    volumes:
+      - influx_data:/var/lib/influxdb2
+      - influx_config:/etc/influxdb2
+
+  sql_db:
+    container_name: pg_edge
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_DB: ${PG_DB_NAME}
+      POSTGRES_USER: ${USER_NAME}
+      POSTGRES_PASSWORD: ${USER_PASSWORD}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - postgres_backup:/backup
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - 5432
+    networks:
+      - lab_net
+
+volumes:
+  ssl:
+    driver: local
+  caddy:
+    driver: local
+  web_config:
+    driver: local
+  web_data:
+    driver: local
+  influx_data:
+    driver: local
+  influx_config:
+    driver: local
+  postgres_backup:
+    driver: local
+  postgres_data:
+    driver: local
+
+
+networks:
+  lab_net:
+    external: yes
